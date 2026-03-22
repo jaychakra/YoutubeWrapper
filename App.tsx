@@ -1,58 +1,85 @@
 const injectedJS = `
 (function() {
 
-function removeShorts(){
+// HTML Blocks related to shorts selector
+const SELECTORS = [
+  'ytd-rich-section-renderer',
+  'ytm-rich-section-renderer',
+  'ytm-reel-shelf-renderer',
+  'ytd-reel-shelf-renderer',
+  '[aria-label="Shorts"]',
+  'a[href^="/shorts"]'  
+];
 
-  // Remove Shorts in between videos
+// HTML Blocks for top feed filter
+SELECTORS.push('ytm-feed-filter-chip-bar-renderer'); 
 
-  // HTML Blocks related to shorts selector
-  const selectors = [
-    'ytd-rich-section-renderer',
-    'ytm-rich-section-renderer',
-    'ytm-reel-shelf-renderer',
-    'ytd-reel-shelf-renderer',
-    '[aria-label="Shorts"]',
-    'a[href^="/shorts"]'  
-  ];
+// HTML Blocks related to action button
+SELECTORS.push('ytm-slim-video-action-bar-renderer'); 
 
-  // HTML Blocks for top feed filter
-  selectors.push('ytm-feed-filter-chip-bar-renderer'); 
-
-  // HTML Blocks related to action button
-  selectors.push('ytm-slim-video-action-bar-renderer'); 
-  
-  // HTML Blocks related to carousel view
-  selectors.push('yt-video-metadata-carousel-view-model'); 
-  
-
-  // HTML Blocks related to chips below the video scroll
-  selectors.push('ytm-chip-cloud-renderer'); 
-  
-  // HTML Blocks related to Subscribe Button
-  selectors.push('.slim-owner-subscribe-button'); 
-
-  // HTML block to open youtube app
-  selectors.push('ytm-mobile-topbar-renderer a[href^="intent://"]'); 
+// HTML Blocks related to carousel view
+SELECTORS.push('yt-video-metadata-carousel-view-model'); 
 
 
-  // Remove all the selectors
-  selectors.forEach(sel => {
-    document.querySelectorAll(sel).forEach(el => el.remove());
+// HTML Blocks related to chips below the video scroll
+SELECTORS.push('ytm-chip-cloud-renderer'); 
+
+// HTML Blocks related to Subscribe Button
+SELECTORS.push('.slim-owner-subscribe-button'); 
+
+// HTML block to open youtube app
+SELECTORS.push('a[href^="intent://"]'); 
+
+
+function processNode(node) {
+  if (!node || node.nodeType !== 1) return;
+
+  SELECTORS.forEach(sel => {
+    if (node.matches?.(sel)) node.remove();
   });
 
-  // Remove bottom shorts tab
-  document
-    .querySelectorAll('.pivot-shorts')
-    .forEach(el => {
-      const tab = el.closest('ytm-pivot-bar-item-renderer');
-      if (tab) tab.remove();
-    });
+  SELECTORS.forEach(sel => {
+    node.querySelectorAll?.(sel).forEach(el => el.remove());
+  });
+  
+  document.querySelectorAll?.('.pivot-shorts').forEach(el => {
+    el.closest('ytm-pivot-bar-item-renderer')?.remove();
+  });
 }
 
-removeShorts();
+// Initial pass
+processNode(document);
 
-const observer = new MutationObserver(removeShorts);
+// Incremental observer
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach(m => {
+    m.addedNodes.forEach(processNode);
+  });
+});
 observer.observe(document.body,{childList:true,subtree:true});
+
+
+
+// function removeShorts(){
+  
+//   // Remove all the selectors
+//   SELECTORS.forEach(sel => {
+//     document.querySelectorAll(sel).forEach(el => el.remove());
+//   });
+
+//   // Remove bottom shorts tab
+//   document
+//     .querySelectorAll('.pivot-shorts')
+//     .forEach(el => {
+//       const tab = el.closest('ytm-pivot-bar-item-renderer');
+//       if (tab) tab.remove();
+//     });
+// }
+
+// removeShorts();
+
+// const observer = new MutationObserver(removeShorts);
+// observer.observe(document.body,{childList:true,subtree:true});
 
 
 // Lock Orientation
@@ -119,6 +146,7 @@ export default function App() {
     const backAction = () => {
 
       if (webViewRef.current) {
+        // webViewRef.current.goBack();
         webViewRef.current.injectJavaScript(
           "window.history.back(); true;"
         );

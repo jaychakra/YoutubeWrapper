@@ -23,6 +23,10 @@ cd android
 ./gradlew assembleRelease
 ```
 
+Your build may fail. 
+
+source ~/.bash_profile and run this on Java 17
+
 
 #### Install
 ```
