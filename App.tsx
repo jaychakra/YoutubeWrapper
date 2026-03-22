@@ -4,10 +4,37 @@ const injectedJS = `
 function removeShorts(){
 
   // Remove Shorts in between videos
-  document.querySelectorAll('ytd-rich-section-renderer').forEach(e=>e.remove());
-  document.querySelectorAll('ytm-rich-section-renderer').forEach(e=>e.remove());
 
-  document.querySelectorAll('a[href^="/shorts"]').forEach(e=>e.remove());
+  // HTML Blocks related to shorts selector
+  const selectors = [
+    'ytd-rich-section-renderer',
+    'ytm-rich-section-renderer',
+    'ytm-reel-shelf-renderer',
+    'ytd-reel-shelf-renderer',
+    '[aria-label="Shorts"]',
+    'a[href^="/shorts"]',
+  ];
+
+  // HTML Blocks for top feed filter
+  selectors.push('ytm-feed-filter-chip-bar-renderer'); 
+
+  // HTML Blocks related to action button
+  selectors.push('ytm-slim-video-action-bar-renderer'); 
+  
+  // HTML Blocks related to carousel view
+  selectors.push('yt-video-metadata-carousel-view-model'); 
+  
+
+  // HTML Blocks related to chips below the video scroll
+  selectors.push('ytm-chip-cloud-renderer'); 
+  
+  // HTML Blocks related to Subscribe Button
+  selectors.push('.slim-owner-subscribe-button'); 
+
+  // Remove all the selectors
+  selectors.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => el.remove());
+  });
 
   // Remove bottom shorts tab
   document
@@ -16,20 +43,6 @@ function removeShorts(){
       const tab = el.closest('ytm-pivot-bar-item-renderer');
       if (tab) tab.remove();
     });
-
-  // Remove Action buttons
-  document.querySelectorAll('ytm-slim-video-action-bar-renderer').forEach(e=>e.remove());
-
-  // Remove comments
-  document.querySelectorAll('yt-video-metadata-carousel-view-model').forEach(e=>e.remove());
-  
-  // Remove chips below the video scroll
-  document.querySelectorAll('ytm-chip-cloud-renderer').forEach(e=>e.remove());
-
-  // slim-owner-subscribe-button
-    document.querySelectorAll('.slim-owner-subscribe-button').forEach(e=>e.remove());
-
-
 }
 
 removeShorts();
