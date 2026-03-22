@@ -12,7 +12,7 @@ function removeShorts(){
     'ytm-reel-shelf-renderer',
     'ytd-reel-shelf-renderer',
     '[aria-label="Shorts"]',
-    'a[href^="/shorts"]',
+    'a[href^="/shorts"]'  
   ];
 
   // HTML Blocks for top feed filter
@@ -30,6 +30,10 @@ function removeShorts(){
   
   // HTML Blocks related to Subscribe Button
   selectors.push('.slim-owner-subscribe-button'); 
+
+  // HTML block to open youtube app
+  selectors.push('ytm-mobile-topbar-renderer a[href^="intent://"]'); 
+
 
   // Remove all the selectors
   selectors.forEach(sel => {
