@@ -14,6 +14,8 @@ const earlyJS = `
       'a[href*="/shorts/"]',
       '.pivot-shorts',
       'ytm-pivot-bar-item-renderer:has(a[href^="/shorts"])',
+      'ytm-pivot-bar-item-renderer:has(a[href*="/shorts/"])',
+      'ytm-pivot-bar-item-renderer:has(.pivot-shorts)',
       'ytm-feed-filter-chip-bar-renderer',
       'ytm-slim-video-action-bar-renderer',
       'yt-video-metadata-carousel-view-model',
@@ -103,6 +105,37 @@ var CLUTTER_SELECTORS = [
   'a[href^="intent://"]'
 ];
 
+function adjustBottomBarLayout() {
+  try {
+    var bar = document.querySelector('ytm-pivot-bar-renderer, [role="tablist"]');
+    if (!bar) return;
+
+    var tabs = bar.querySelectorAll('ytm-pivot-bar-item-renderer, [role="tab"]');
+    for (var i = 0; i < tabs.length; i++) {
+      var t = tabs[i];
+      var text = (t.innerText || t.textContent || '').trim().toLowerCase();
+      var aria = (t.getAttribute('aria-label') || '').toLowerCase();
+      var link = t.querySelector('a');
+      var href = (link ? link.getAttribute('href') : '') || '';
+
+      // EXPLICIT PROTECTION: NEVER remove Subscriptions, Home, or Account/Library
+      if (text.indexOf('subscript') !== -1 || aria.indexOf('subscript') !== -1 || href.indexOf('subscript') !== -1) continue;
+      if (text.indexOf('home') !== -1 || aria.indexOf('home') !== -1 || href === '/' || href === '') continue;
+      if (text.indexOf('you') !== -1 || text.indexOf('library') !== -1 || aria.indexOf('you') !== -1 || aria.indexOf('library') !== -1) continue;
+
+      // Only match and remove Shorts
+      var isShorts = t.querySelector('.pivot-shorts, a[href*="shorts"]') ||
+                     aria.indexOf('shorts') !== -1 ||
+                     text === 'shorts';
+
+      if (isShorts) {
+        t.style.setProperty('display', 'none', 'important');
+        t.remove();
+      }
+    }
+  } catch(e) {}
+}
+
 function removeShortsAndClutter() {
   try {
     // 1. Remove Shorts shelves and their wrapper sections
@@ -118,12 +151,8 @@ function removeShortsAndClutter() {
       }
     }
 
-    // 2. Remove Shorts tab from bottom navigation bar
-    var shortsTabs = document.querySelectorAll('.pivot-shorts, a[href^="/shorts"]');
-    for (var k = 0; k < shortsTabs.length; k++) {
-      var tab = shortsTabs[k].closest('ytm-pivot-bar-item-renderer, [role="tab"]');
-      if (tab) tab.remove();
-    }
+    // 2. Adjust bottom navigation bar to 3 items at 33.333%
+    adjustBottomBarLayout();
 
     // 3. Remove UI clutter
     for (var c = 0; c < CLUTTER_SELECTORS.length; c++) {
