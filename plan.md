@@ -13,13 +13,14 @@
 ### 2. Video Card Filtering Architecture
 - **Target Selectors:**
   `ytm-rich-item-renderer`, `ytd-rich-item-renderer`, `ytm-video-with-context-renderer`, `yt-lockup-view-model`, `ytm-video-renderer`, `ytm-compact-video-renderer`
-- **Card Processing Lifecycle:**
-  1. Detects card added to DOM via `MutationObserver` or `setInterval(1000)` sweep.
-  2. If card is Shorts $\rightarrow$ removed instantly.
-  3. Extracts channel handle and name from `yt-content-metadata-view-model`, anchor tags, or metadata spans.
-  4. Checks against the 69-channel whitelist via `isSubscribed()`.
-  5. If subscribed: marks `card.dataset.kidsytChecked = '1'` (remains visible).
-  6. If unsubscribed: `card.remove()` (removed from feed).
+- **Non-Destructive DOM Lifecycle (Virtual DOM & SPA Friendly):**
+  1. Detects card added to DOM via `MutationObserver`, navigation events (`yt-navigate-finish`, `popstate`), or continuous sweep.
+  2. If card is Shorts $\rightarrow$ `hideCard(card)` (`display: none !important;`).
+  3. If currently on Subscriptions tab (`/feed/subscriptions`) $\rightarrow$ `showCard(card)` (all videos on this tab are subscribed by definition).
+  4. If on Home feed $\rightarrow$ extracts channel handle and name from `yt-content-metadata-view-model`, anchor tags, or metadata spans.
+  5. Checks against the 69-channel whitelist via `isSubscribed()`.
+  6. If subscribed: `showCard(card)` and records `dataset.kidsytPath` and `dataset.kidsytVideo`.
+  7. If unsubscribed: `hideCard(card)` (`display: none !important;`). Elements are never removed with `.remove()` to prevent breaking Lit / Polymer virtual DOM reconciliation across tab switching.
 
 ### 3. Shorts & UI Suppression
 - Pre-rendered CSS (`earlyJS`) hides all Shorts elements, links, and the bottom Shorts tab before paint.

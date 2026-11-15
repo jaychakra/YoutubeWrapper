@@ -138,15 +138,23 @@ function adjustBottomBarLayout() {
 
 function removeShortsAndClutter() {
   try {
-    // 1. Remove Shorts shelves and their wrapper sections
+    // 1. Hide Shorts shelves and sections
     for (var i = 0; i < SHORTS_SELECTORS.length; i++) {
       var elements = document.querySelectorAll(SHORTS_SELECTORS[i]);
       for (var j = 0; j < elements.length; j++) {
-        var parentSection = elements[j].closest('ytm-rich-section-renderer, ytd-rich-section-renderer');
+        var el = elements[j];
+        if (el.closest('ytm-pivot-bar-renderer, [role="tablist"]')) {
+          continue; // Bottom bar handled separately
+        }
+        var parentSection = el.closest('ytm-rich-section-renderer, ytd-rich-section-renderer');
         if (parentSection) {
-          parentSection.remove();
+          if (!parentSection.querySelector('a[href*="/watch?v="]')) {
+            parentSection.style.setProperty('display', 'none', 'important');
+          } else {
+            el.style.setProperty('display', 'none', 'important');
+          }
         } else {
-          elements[j].remove();
+          el.style.setProperty('display', 'none', 'important');
         }
       }
     }
@@ -154,11 +162,11 @@ function removeShortsAndClutter() {
     // 2. Adjust bottom navigation bar to 3 items at 33.333%
     adjustBottomBarLayout();
 
-    // 3. Remove UI clutter
+    // 3. Hide UI clutter
     for (var c = 0; c < CLUTTER_SELECTORS.length; c++) {
       var clutterEls = document.querySelectorAll(CLUTTER_SELECTORS[c]);
       for (var d = 0; d < clutterEls.length; d++) {
-        clutterEls[d].remove();
+        clutterEls[d].style.setProperty('display', 'none', 'important');
       }
     }
   } catch(e) {}
@@ -496,22 +504,34 @@ var CARD_SELECTOR = [
   'ytm-media-item'
 ].join(', ');
 
-function findVideoCard(startEl) {
-  var curr = startEl.parentElement;
-  var best = null;
-  while (curr && curr !== document.body && curr !== document.documentElement) {
-    var hasCh = curr.querySelector('a[href*="/@"], a[href*="/channel/"], a[href*="/c/"], [class*="metadata"], [class*="byline"], [class*="channel"]');
-    if (hasCh) {
-      best = curr;
-      var p = curr.parentElement;
-      if (p && (p.tagName.indexOf('ITEM') !== -1 || p.tagName.indexOf('RENDERER') !== -1 || (p.className && p.className.indexOf('item') !== -1))) {
-        best = p;
-      }
-      break;
-    }
-    curr = curr.parentElement;
+function hideCard(card) {
+  if (!card) return;
+  card.style.setProperty('display', 'none', 'important');
+  var parent = card.closest('ytm-rich-item-renderer, ytd-rich-item-renderer, ytm-video-with-context-renderer');
+  if (parent && parent !== card) {
+    parent.style.setProperty('display', 'none', 'important');
   }
-  return best || startEl.closest(CARD_SELECTOR) || startEl.parentElement;
+}
+
+function showCard(card) {
+  if (!card) return;
+  card.style.removeProperty('display');
+  var parent = card.closest('ytm-rich-item-renderer, ytd-rich-item-renderer, ytm-video-with-context-renderer');
+  if (parent && parent !== card) {
+    parent.style.removeProperty('display');
+  }
+}
+
+function findVideoCard(startEl) {
+  if (!startEl) return null;
+  var card = startEl.closest('ytm-rich-item-renderer, ytd-rich-item-renderer, ytm-video-with-context-renderer, ytm-video-renderer, ytm-compact-video-renderer, ytm-media-item');
+  if (card) return card;
+  card = startEl.closest('yt-lockup-view-model');
+  if (card) {
+    var parentItem = card.closest('ytm-rich-item-renderer, ytd-rich-item-renderer, ytm-video-with-context-renderer');
+    return parentItem || card;
+  }
+  return startEl.closest(CARD_SELECTOR) || startEl;
 }
 
 function getCardChannelInfo(card) {
@@ -520,7 +540,10 @@ function getCardChannelInfo(card) {
   var isShort = false;
 
   // 1. Is this a Shorts video card?
-  if (card.querySelector('a[href^="/shorts"], a[href*="/shorts/"], [aria-label*="Shorts"]')) {
+  if (
+    (card.matches && card.matches('ytm-reel-item-renderer, ytd-reel-item-renderer')) ||
+    card.querySelector('a[href^="/shorts"], a[href*="/shorts/"], ytm-reel-item-renderer, ytd-reel-item-renderer, [overlay-style="SHORTS"]')
+  ) {
     return { isShort: true, name: null, url: null, isMultiple: false };
   }
 
@@ -581,59 +604,86 @@ function getCardChannelInfo(card) {
   if (name) name = name.trim();
   if (url) url = url.trim().toLowerCase();
 
-  var isMulti = false;
-  if (name && isMultiChannelName(name)) isMulti = true;
-
-  return { name: name, url: url, isShort: isShort, isMultiple: isMulti };
+  return { name: name, url: url, isShort: isShort, isMultiple: false };
 }
 
 function processCard(card) {
   if (!card || !card.isConnected) return;
-  if (card.dataset && card.dataset.kidsytChecked === '1') return;
 
-  // If card is still a placeholder/skeleton with no watch link or negligible text, wait
+  var pathname = window.location.pathname;
+  var isSubPage = pathname.indexOf('/feed/subscriptions') === 0;
+
   var watchLink = card.querySelector('a[href*="/watch?v="], a[href^="/watch"]');
-  var text = (card.innerText || card.textContent || '').trim();
-  if (!watchLink && text.length < 5) {
-    return; // Skeleton / loading placeholder — do not delete!
+  var currentVideoHref = watchLink ? (watchLink.getAttribute('href') || '') : '';
+
+  // Skip if already processed for this exact page and video
+  if (card.dataset && card.dataset.kidsytPath === pathname && card.dataset.kidsytVideo === currentVideoHref && card.dataset.kidsytChecked) {
+    return;
   }
 
   var info = getCardChannelInfo(card);
 
-  // Shorts are always removed
+  // Shorts are ALWAYS hidden (Home, Subscriptions, Explore, etc.)
   if (info.isShort) {
+    hideCard(card);
+    if (card.dataset) {
+      card.dataset.kidsytPath = pathname;
+      card.dataset.kidsytVideo = currentVideoHref;
+      card.dataset.kidsytChecked = 'shorts';
+    }
     _dbgRemoved++;
-    card.remove();
     updateDebugOverlay();
     return;
   }
 
-  // Wait for subscriptions to be loaded before filtering
-  if (!subsLoaded) {
+  // --- ON SUBSCRIPTIONS TAB ---
+  if (isSubPage) {
+    // Every regular video in Subscriptions feed is from a subscribed channel!
+    showCard(card);
+    if (card.dataset) {
+      card.dataset.kidsytPath = pathname;
+      card.dataset.kidsytVideo = currentVideoHref;
+      card.dataset.kidsytChecked = '1';
+    }
+    _dbgChecked++;
+    _dbgLastChannel = (info.name || 'sub-video') + ' [SUB-PAGE]';
+    updateDebugOverlay();
     return;
+  }
+
+  // --- ON HOME / OTHER FEEDS ---
+  var text = (card.innerText || card.textContent || '').trim();
+  if (!watchLink && text.length < 5) {
+    return; // Placeholder / skeleton — wait for data
+  }
+
+  if (!subsLoaded) {
+    return; // Wait for subscriptions cache to load
   }
 
   _dbgChecked++;
-
-  // Multi-channel collaborations are not allowed
-  if (info.isMultiple) {
-    _dbgRemoved++;
-    card.remove();
-    updateDebugOverlay();
-    return;
-  }
 
   if (info.name || info.url) {
     var isSub = isSubscribed(info.name, info.url);
     _dbgLastChannel = (info.name || info.url) + (isSub ? ' [OK]' : ' [BLOCKED]');
     if (isSub) {
-      if (card.dataset) card.dataset.kidsytChecked = '1';
+      showCard(card);
+      if (card.dataset) {
+        card.dataset.kidsytPath = pathname;
+        card.dataset.kidsytVideo = currentVideoHref;
+        card.dataset.kidsytChecked = '1';
+      }
     } else {
+      hideCard(card);
+      if (card.dataset) {
+        card.dataset.kidsytPath = pathname;
+        card.dataset.kidsytVideo = currentVideoHref;
+        card.dataset.kidsytChecked = 'blocked';
+      }
       _dbgRemoved++;
-      card.remove();
     }
   } else {
-    // Has a watch link but channel not identified yet
+    // Channel not identified yet — wait for Lit to render metadata
     _dbgLastChannel = 'waiting: ' + text.substring(0, 20);
   }
 
@@ -659,9 +709,12 @@ function sweepExistingCards() {
   // Method 2: Scan standard card selectors
   var cards = document.querySelectorAll(CARD_SELECTOR);
   for (var i = 0; i < cards.length; i++) {
-    if (!seen.has(cards[i])) {
-      seen.add(cards[i]);
-      toProcess.push(cards[i]);
+    var card = cards[i];
+    var parentItem = card.closest('ytm-rich-item-renderer, ytd-rich-item-renderer, ytm-video-with-context-renderer');
+    var target = parentItem || card;
+    if (!seen.has(target)) {
+      seen.add(target);
+      toProcess.push(target);
     }
   }
 
@@ -729,6 +782,8 @@ history.replaceState = function() {
   onNavigate();
 };
 window.addEventListener('popstate', onNavigate);
+window.addEventListener('yt-navigate-finish', onNavigate);
+window.addEventListener('yt-page-data-updated', onNavigate);
 
 var lastUrl = window.location.href;
 setInterval(function() {
@@ -736,31 +791,40 @@ setInterval(function() {
     lastUrl = window.location.href;
     onNavigate();
   }
-}, 800);
+}, 400);
 
 function onNavigate() {
   lastGuardedUrl = '';
-  if (window.location.pathname.indexOf('/watch') === 0) {
+  var pathname = window.location.pathname;
+
+  if (pathname.indexOf('/watch') === 0) {
     guardWatchPage();
     setTimeout(guardWatchPage, 500);
     setTimeout(guardWatchPage, 1200);
     setTimeout(guardWatchPage, 2500);
   } else {
     sweepExistingCards();
-    setTimeout(sweepExistingCards, 800);
+    setTimeout(sweepExistingCards, 200);
+    setTimeout(sweepExistingCards, 600);
+    setTimeout(sweepExistingCards, 1200);
   }
 }
 
 function processNode(node) {
   if (!node || node.nodeType !== 1) return;
 
-  // 1. Remove Shorts and Clutter
+  // 1. Hide Shorts elements
   for (var i = 0; i < SHORTS_SELECTORS.length; i++) {
     var sel = SHORTS_SELECTORS[i];
     if (node.matches && node.matches(sel)) {
-      var parentSection = node.closest('ytm-rich-section-renderer, ytd-rich-section-renderer');
-      if (parentSection) parentSection.remove();
-      else node.remove();
+      if (!node.closest('ytm-pivot-bar-renderer, [role="tablist"]')) {
+        var parentSection = node.closest('ytm-rich-section-renderer, ytd-rich-section-renderer');
+        if (parentSection && !parentSection.querySelector('a[href*="/watch?v="]')) {
+          parentSection.style.setProperty('display', 'none', 'important');
+        } else {
+          node.style.setProperty('display', 'none', 'important');
+        }
+      }
       return;
     }
   }
